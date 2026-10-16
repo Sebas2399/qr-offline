@@ -176,17 +176,28 @@ self.onmessage = e => {
 const CODIGO_LECTOR = `
 // tryHarder/tryDownscale apagados: 3 veces más rápido y suficiente para QR que llenan la imagen
 const OPC = { formats: ["QRCode"], tryHarder: false, tryDownscale: false, tryInvert: false, tryRotate: false, tryDenoise: false };
+let oc = null, octx = null;
 self.onmessage = async e => {
   const m = e.data;
   if (m.tipo === "iniciar") {
-    try { await ZXingWASM.prepareZXingModule({ overrides: { wasmBinary: m.wasm }, fireImmediately: true }); postMessage({ tipo: "listo" }); }
+    try { await ZXingWASM.prepareZXingModule({ overrides: { wasmBinary: m.wasm }, fireImmediately: true });
+          postMessage({ tipo: "listo", offscreen: typeof OffscreenCanvas !== "undefined" }); }
     catch (err) { postMessage({ tipo: "fallo", msg: String(err) }); }
     return;
   }
-  let textos = [];
-  const img = new ImageData(new Uint8ClampedArray(m.buf), m.w, m.h);
-  try { textos = (await ZXingWASM.readBarcodes(img, { ...OPC, maxNumberOfSymbols: 6 })).filter(r => r.isValid).map(r => r.text); } catch {}
-  postMessage({ tipo: "resultado", textos, buf: img.data.buffer }, [img.data.buffer]);
+  let textos = [], img = null;
+  try {
+    if (m.bmp) {
+      const w = m.bmp.width, h = m.bmp.height;
+      if (!oc || oc.width !== w || oc.height !== h) { oc = new OffscreenCanvas(w, h); octx = oc.getContext("2d", { willReadFrequently: true }); }
+      octx.drawImage(m.bmp, 0, 0);
+      img = octx.getImageData(0, 0, w, h);
+    } else img = new ImageData(new Uint8ClampedArray(m.buf), m.w, m.h);
+    textos = (await ZXingWASM.readBarcodes(img, { ...OPC, maxNumberOfSymbols: 6 })).filter(r => r.isValid).map(r => r.text);
+  } catch {}
+  if (m.bmp) m.bmp.close();
+  img = null;
+  postMessage({ tipo: "resultado", textos });
 };`;
 
 let wasmBytes = null;
@@ -363,7 +374,7 @@ if (!document.documentElement.requestFullscreen) $("btnCompleta").classList.add(
 $("btnCompleta").onclick = () => $("lienzoCaja").requestFullscreen().catch(() => {});
 
 // ================= RECIBIR =================
-const rx = { activo: false, flujo: null, lectores: [], local: false, camaras: [], camIdx: -1, t0: 0, ultimaUI: 0, bufs: [] };
+const rx = { activo: false, flujo: null, lectores: [], local: false, bitmap: true, camaras: [], camIdx: -1, t0: 0, ultimaUI: 0 };
 const dec = new QRT.Decodificador();
 const video = $("video");
 const lector = document.createElement("canvas");
@@ -380,9 +391,9 @@ async function prepararLectores() {
     promesas.push(new Promise(ok => {
       w.onmessage = e => {
         const m = e.data;
-        if (m.tipo === "listo") { l.ocupado = false; rx.lectores.push(l); ok(); }
+        if (m.tipo === "listo") { l.ocupado = false; if (!m.offscreen) rx.bitmap = false; rx.lectores.push(l); ok(); }
         else if (m.tipo === "fallo") { w.terminate(); ok(); }
-        else if (m.tipo === "resultado") { l.ocupado = false; rx.bufs.push(m.buf); procesar(m.textos); }
+        else if (m.tipo === "resultado") { l.ocupado = false; procesar(m.textos); }
       };
       w.onerror = () => { w.terminate(); ok(); };
     }));
@@ -454,6 +465,15 @@ function capturar() {
   const libre = rx.lectores.find(l => !l.ocupado);
   if (w0 && (libre || (rx.local && !leyendoLocal))) {
     const esc = Math.min(1, 1920 / Math.max(w0, h0)), w = Math.round(w0 * esc), h = Math.round(h0 * esc);
+    if (libre && rx.bitmap && window.createImageBitmap) {
+      // La imagen viaja al hilo sin copiarse en esta página; el hilo la libera al terminar.
+      libre.ocupado = true;
+      (esc < 1 ? createImageBitmap(video, { resizeWidth: w, resizeHeight: h }) : createImageBitmap(video))
+        .then(bmp => { if (rx.activo) libre.w.postMessage({ bmp }, [bmp]); else { bmp.close(); libre.ocupado = false; } })
+        .catch(() => { rx.bitmap = false; libre.ocupado = false; });
+      programar();
+      return;
+    }
     if (lector.width !== w || lector.height !== h) { lector.width = w; lector.height = h; }
     lctx.drawImage(video, 0, 0, w, h);
     const img = lctx.getImageData(0, 0, w, h);
