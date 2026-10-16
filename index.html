@@ -202,7 +202,7 @@ const legible = n => n < 1024 ? n + " B" : n < 1048576 ? (n / 1024).toFixed(1) +
 const tiempo = s => !isFinite(s) ? "–" : s < 60 ? Math.ceil(s) + " s" : Math.floor(s / 60) + " min " + String(Math.round(s % 60)).padStart(2, "0") + " s";
 const num = n => n.toLocaleString("es-CO");
 const SOBRECOSTO = 1.1;  // el decodificador necesita ~10 % más cuadros que bloques
-const HILOS = Math.max(2, Math.min(6, (navigator.hardwareConcurrency || 4) - 1));
+const HILOS = Math.max(2, Math.min(4, (navigator.hardwareConcurrency || 4) - 1));
 const guardarPref = (k, v) => { try { localStorage.setItem("qrOffline." + k, v); } catch {} };
 const leerPref = k => { try { return localStorage.getItem("qrOffline." + k); } catch { return null; } };
 
@@ -215,15 +215,14 @@ function crearTrabajador(codigo) {
   } catch { return null; }
 }
 const CODIGO_GENERADOR = `
-let cod = null, version = 0;
+let cod = null;
 self.onmessage = e => {
   const m = e.data;
-  if (m.tipo === "iniciar") { cod = new QRT.Codificador(new Uint8Array(m.paquete), m.tam, m.sesion); version = 0; return; }
+  if (m.tipo === "iniciar") { cod = new QRT.Codificador(new Uint8Array(m.paquete), m.tam, m.sesion); return; }
   const qrs = [], mover = [];
   for (const seq of m.seqs) {
-    const q = qrcode(version, "L"); q.addData(cod.cuadro(seq), "Alphanumeric"); q.make();
+    const q = qrcode(0, "L"); q.addData(cod.cuadro(seq), "Alphanumeric"); q.make();
     const n = q.getModuleCount(), mod = new Uint8Array(n * n);
-    if (!version) version = (n - 17) / 4;
     for (let r = 0; r < n; r++) for (let c = 0; c < n; c++) mod[r * n + c] = q.isDark(r, c) ? 1 : 0;
     qrs.push({ n, mod }); mover.push(mod.buffer);
   }
@@ -366,9 +365,8 @@ function pedirCuadros() {
       w.w.postMessage({ seqs });
     } else {
       // sin hilos: generar aquí mismo
-      tx.cola.push(seqs.map(seq => { const q = qrcode(tx.version || 0, "L"); q.addData(tx.local.cuadro(seq), "Alphanumeric"); q.make();
+      tx.cola.push(seqs.map(seq => { const q = qrcode(0, "L"); q.addData(tx.local.cuadro(seq), "Alphanumeric"); q.make();
         const n = q.getModuleCount(), mod = new Uint8Array(n * n);
-        if (!tx.version) tx.version = (n - 17) / 4;
         for (let r = 0; r < n; r++) for (let c = 0; c < n; c++) mod[r * n + c] = q.isDark(r, c) ? 1 : 0;
         return { n, mod }; }));
     }
@@ -421,7 +419,7 @@ async function empezar() {
   const paquete = await QRT.empaquetar(nombre, bytes);
   const sesion = crypto.getRandomValues(new Uint32Array(1))[0];
   detenerTransmision();
-  Object.assign(tx, { activo: true, pausado: false, cola: [], pedidos: 0, sigSeq: 0, mostrados: 0, nQR, tam, fps, gens: [], version: 0 });
+  Object.assign(tx, { activo: true, pausado: false, cola: [], pedidos: 0, sigSeq: 0, mostrados: 0, nQR, tam, fps, gens: [] });
   tx.local = new QRT.Codificador(paquete, tam, sesion);
   const K = tx.local.K;
   // en archivos de uno o dos bloques no hace falta más de un QR por cuadro
@@ -712,7 +710,7 @@ $("btnRevisar").onclick = () => {
 };
 
 // ================= RECIBIR =================
-const rx = { activo: false, flujo: null, lectores: [], local: false, bitmap: true, nativo: null, nativoOcupado: false, camaras: [], camIdx: -1, t0: 0, ultimaUI: 0, analizadas: 0, reloj: 0 };
+const rx = { activo: false, flujo: null, lectores: [], local: false, bitmap: true, camaras: [], camIdx: -1, t0: 0, ultimaUI: 0, analizadas: 0, reloj: 0 };
 const dec = new QRT.Decodificador();
 const video = $("video");
 const lector = document.createElement("canvas");
@@ -739,10 +737,6 @@ async function prepararLectores() {
     w.postMessage({ tipo: "iniciar", wasm: bytes.buffer.slice(0) });
   }
   await Promise.race([Promise.all(promesas), new Promise(r => setTimeout(r, 8000))]);
-  try {
-    if ("BarcodeDetector" in window && (await BarcodeDetector.getSupportedFormats()).includes("qr_code"))
-      rx.nativo = new BarcodeDetector({ formats: ["qr_code"] });
-  } catch { rx.nativo = null; }
   if (!rx.lectores.length) {
     // sin hilos: leer en la página misma
     await ZXingWASM.prepareZXingModule({ overrides: { wasmBinary: bytes.buffer.slice(0) }, fireImmediately: true });
@@ -765,7 +759,6 @@ function prepararControl(fila, inp, val, nombre, rango, actual, fmt) {
   const i = $(inp), etiqueta = $(val);
   i.min = rango.min; i.max = nombre === "zoom" ? Math.min(rango.max, 10) : rango.max; i.step = rango.step || 0.1;
   i.value = actual !== undefined ? actual : (nombre === "zoom" ? rango.min : 0);
-  const guardado = parseFloat(leerPref(nombre));
   etiqueta.textContent = fmt(+i.value);
   let pendiente = null, aplicando = false;
   const aplicar = async () => {
@@ -776,10 +769,7 @@ function prepararControl(fila, inp, val, nombre, rango, actual, fmt) {
     aplicando = false;
     if (pendiente !== null) aplicar();
   };
-  i.oninput = () => { etiqueta.textContent = fmt(+i.value); pendiente = +i.value; guardarPref(nombre, i.value); aplicar(); };
-  if (isFinite(guardado) && guardado >= +i.min && guardado <= +i.max && guardado !== +i.value) {
-    i.value = guardado; etiqueta.textContent = fmt(guardado); pendiente = guardado; aplicar();
-  }
+  i.oninput = () => { etiqueta.textContent = fmt(+i.value); pendiente = +i.value; aplicar(); };
   $(fila).classList.remove("oculto");
   return true;
 }
@@ -800,7 +790,7 @@ function infoCamara() {
   try { s = p.getSettings(); } catch {}
   const w = video.videoWidth || s.width, h = video.videoHeight || s.height;
   const fps = s.frameRate ? ` · ${Math.round(s.frameRate)} fps` : "";
-  const hilos = (rx.local ? "1 hilo" : `${rx.lectores.length} hilos`) + (rx.nativo ? " + lector del celular" : "");
+  const hilos = rx.local ? "1 hilo" : `${rx.lectores.length} hilos`;
   const nombre = (p.label || "Cámara").slice(0, 40);
   $("infoCam").textContent = `${nombre} · ${w}×${h}${fps} · ${hilos} · analiza ${rx.analizadas} imágenes/s`;
   rx.analizadas = 0;
@@ -877,18 +867,8 @@ function programar() {
 }
 
 let leyendoLocal = false;
-function leerNativo() {
-  if (!rx.nativo || rx.nativoOcupado || !video.videoWidth) return;
-  rx.nativoOcupado = true;
-  rx.nativo.detect(video)
-    .then(cs => procesar(cs.map(c => ({ t: c.rawValue, p: c.cornerPoints && c.cornerPoints.length === 4 ? c.cornerPoints.flatMap(q => [q.x, q.y]) : null })), 1))
-    .catch(() => { rx.nativo = null; })
-    .finally(() => { rx.nativoOcupado = false; });
-}
-
 function capturar() {
   if (!rx.activo) return;
-  leerNativo();
   const w0 = video.videoWidth, h0 = video.videoHeight;
   const libre = rx.lectores.find(l => !l.ocupado);
   if (w0 && (libre || (rx.local && !leyendoLocal))) {
