@@ -1,0 +1,14 @@
+{
+  "name": "QR Offline",
+  "short_name": "QR Offline",
+  "description": "Pasa archivos entre pantallas y cámaras con QR animados, sin internet.",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#0f1218",
+  "theme_color": "#0f1218",
+  "icons": [
+    { "src": "icono-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "icono-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable" }
+  ]
+}
