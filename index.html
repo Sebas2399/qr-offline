@@ -9,9 +9,9 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <title>QR Offline</title>
 <style>
-:root { --bg:#f6f7f9; --card:#fff; --tx:#1d2330; --mut:#6b7280; --ac:#2563eb; --bd:#e5e7eb; --ok:#16a34a; --mal:#dc2626; }
+:root { --bg:#f6f7f9; --card:#fff; --tx:#1d2330; --mut:#6b7280; --ac:#2563eb; --bd:#e5e7eb; --ok:#16a34a; --mal:#dc2626; --av:#b45309; }
 @media (prefers-color-scheme: dark) {
-  :root { --bg:#0f1218; --card:#181c24; --tx:#e7e9ee; --mut:#9aa3b2; --ac:#60a5fa; --bd:#2a303c; --ok:#4ade80; --mal:#f87171; }
+  :root { --bg:#0f1218; --card:#181c24; --tx:#e7e9ee; --mut:#9aa3b2; --ac:#60a5fa; --bd:#2a303c; --ok:#4ade80; --mal:#f87171; --av:#fbbf24; }
 }
 * { box-sizing:border-box; }
 html, body { margin:0; background:var(--bg); color:var(--tx); }
@@ -20,9 +20,14 @@ main { max-width:980px; margin:0 auto; padding:16px; }
 .angosto { max-width:680px; margin:0 auto; }
 h1 { font-size:1.3rem; margin:6px 0 2px; }
 .sub { color:var(--mut); font-size:.88rem; margin:0 0 14px; }
+body.recibiendo .cabecera { display:none; }
+body.transmitiendo main { max-width:none; }
 .tabs { display:grid; grid-template-columns:1fr 1fr; gap:6px; background:var(--card); border:1px solid var(--bd); border-radius:12px; padding:4px; margin-bottom:14px; }
 .tabs button { background:transparent; color:var(--tx); margin:0; }
 .tabs button[aria-selected=true] { background:var(--ac); color:#fff; }
+.segmentos { display:grid; grid-template-columns:repeat(3,1fr); gap:4px; background:var(--bg); border:1px solid var(--bd); border-radius:10px; padding:3px; margin-bottom:12px; }
+.segmentos button { margin:0; padding:8px 2px; background:transparent; color:var(--tx); font-weight:500; font-size:.85rem; white-space:nowrap; }
+.segmentos button[aria-selected=true] { background:var(--card); color:var(--ac); font-weight:600; box-shadow:0 1px 2px rgba(0,0,0,.15); }
 section { background:var(--card); border:1px solid var(--bd); border-radius:12px; padding:16px; margin-bottom:14px; }
 h2 { font-size:1rem; margin:0 0 10px; }
 button { background:var(--ac); color:#fff; border:0; border-radius:8px; padding:11px 14px; font-size:1rem; width:100%; margin-top:10px; cursor:pointer; font-weight:600; }
@@ -31,20 +36,31 @@ button:disabled { opacity:.5; cursor:default; }
 .fila { display:flex; gap:8px; flex-wrap:wrap; }
 .fila > * { flex:1 1 140px; }
 label { display:block; font-size:.85rem; color:var(--mut); margin:10px 0 4px; }
+label.check { display:flex; gap:8px; align-items:center; color:var(--tx); font-size:.9rem; margin-top:12px; }
 select, input[type=text], textarea { width:100%; padding:10px; border:1px solid var(--bd); border-radius:8px; background:var(--bg); color:var(--tx); font-size:.95rem; }
-input[type=file] { width:100%; }
+input[type=file], input[type=range] { width:100%; }
 textarea { min-height:120px; font-family:ui-monospace,Menlo,Consolas,monospace; }
+textarea#pedido { min-height:70px; font-family:inherit; }
 details summary { cursor:pointer; color:var(--ac); margin-top:12px; }
 .oculto { display:none !important; }
 .estado { color:var(--mut); font-size:.9rem; margin-top:8px; min-height:1.3em; }
-.nota { color:var(--mut); font-size:.85rem; margin:8px 0 0; }
+.nota { color:var(--mut); font-size:.85rem; margin:8px 0 0; overflow-wrap:anywhere; }
+.aviso { color:var(--av); }
+.resumen { margin:10px 0 0; font-weight:600; }
+.lista { max-height:260px; overflow:auto; border:1px solid var(--bd); border-radius:8px; margin-top:8px; }
+.lista label { display:flex; flex-wrap:wrap; gap:2px 8px; align-items:baseline; margin:0; padding:6px 10px; border-top:1px solid var(--bd); color:var(--tx); font-size:.85rem; }
+.lista label:first-child { border-top:0; }
+.lista .ruta { flex:1; min-width:0; word-break:break-all; font-family:ui-monospace,Menlo,Consolas,monospace; font-size:.8rem; }
+.lista .meta { color:var(--mut); font-size:.75rem; flex-basis:100%; padding-left:22px; }
+.lista p { padding:6px 10px; margin:0; }
 .barra { height:8px; background:var(--bd); border-radius:99px; overflow:hidden; margin-top:10px; }
 .barra > div { height:100%; width:0; background:var(--ac); transition:width .25s; }
 #lienzoCaja { background:#fff; border-radius:12px; display:flex; align-items:center; justify-content:center; padding:8px; }
 #lienzoCaja:fullscreen { border-radius:0; padding:0; }
 #lienzo { image-rendering:pixelated; image-rendering:crisp-edges; display:block; }
-.camara { position:relative; border-radius:12px; overflow:hidden; background:#000; aspect-ratio:4/3; }
+.camara { position:relative; border-radius:12px; overflow:hidden; background:#000; aspect-ratio:4/3; max-height:70vh; margin:0 auto; }
 .camara video { width:100%; height:100%; object-fit:contain; display:block; }
+.camara canvas { position:absolute; inset:0; width:100%; height:100%; pointer-events:none; }
 .listo { border-color:var(--ok); }
 .listo h2 { color:var(--ok); }
 .nombre { font-weight:600; word-break:break-all; }
@@ -58,8 +74,10 @@ details summary { cursor:pointer; color:var(--ac); margin-top:12px; }
 <body>
 <main>
 <div class="angosto">
+<div class="cabecera">
 <h1>QR Offline</h1>
 <p class="sub">Pasa archivos de una pantalla a una cámara. Sin internet, sin Wi-Fi, sin Bluetooth.</p>
+</div>
 
 <div class="tabs" role="tablist">
   <button role="tab" id="tabEnviar" aria-selected="true">Enviar</button>
@@ -71,24 +89,50 @@ details summary { cursor:pointer; color:var(--ac); margin-top:12px; }
 <div id="panelEnviar">
   <section id="configEnviar" class="angosto">
     <h2>Elige qué enviar</h2>
-    <input type="file" id="archivo">
-    <details id="detTexto">
-      <summary>O pega texto o código</summary>
-      <label for="nombreTexto">Nombre del archivo</label>
+    <div class="segmentos" role="tablist" aria-label="Qué enviar">
+      <button role="tab" data-fuente="archivo" aria-selected="true">Archivo</button>
+      <button role="tab" data-fuente="texto" aria-selected="false">Texto</button>
+      <button role="tab" data-fuente="carpeta" aria-selected="false">Carpeta para IA</button>
+    </div>
+
+    <div id="fuente-archivo">
+      <input type="file" id="archivo">
+    </div>
+
+    <div id="fuente-texto" class="oculto">
+      <label for="nombreTexto" style="margin-top:0">Nombre del archivo</label>
       <input type="text" id="nombreTexto" value="codigo.py">
       <label for="texto">Contenido</label>
       <textarea id="texto" placeholder="Pega aquí tu código o texto"></textarea>
-    </details>
+    </div>
+
+    <div id="fuente-carpeta" class="oculto">
+      <p class="nota" style="margin:0 0 10px">Junta los archivos de texto de una carpeta en un solo <b>.md</b> con la estructura del proyecto y el contenido de cada archivo, listo para adjuntar en la IA. Deja fuera dependencias, binarios y archivos generados.</p>
+      <input type="file" id="carpeta" webkitdirectory multiple>
+      <p class="estado" id="estadoIA"></p>
+      <div id="resumenIA" class="oculto">
+        <p class="resumen" id="resumenTxt"></p>
+        <p class="nota" id="omitidosTxt"></p>
+        <p class="nota" id="secretosTxt"></p>
+        <details id="detLista"><summary id="sumLista">Ver archivos</summary><div class="lista" id="listaIA"></div></details>
+        <label for="pedido">¿Qué necesitas de la IA? (opcional, va al inicio del archivo)</label>
+        <textarea id="pedido" placeholder="Ej.: Ayúdame a crear un script que lea estos reportes y genere un resumen diario."></textarea>
+        <label class="check"><input type="checkbox" id="ocultarSecretos" checked> Ocultar las contraseñas y llaves que encuentre</label>
+        <button class="sec" id="btnRevisar">Guardar el .md para revisarlo</button>
+      </div>
+    </div>
+
     <label for="modo">Modo</label>
     <select id="modo">
       <option value="segura">Segura · 1 QR, fácil de leer</option>
       <option value="rapida" selected>Rápida · 2 QR a la vez</option>
-      <option value="turbo">Turbo · 4 QR a la vez (necesita buena cámara)</option>
+      <option value="turbo">Turbo · 4 QR a la vez</option>
+      <option value="maxima">Máxima · 6 QR a la vez (celular horizontal)</option>
       <option value="manual">Personalizado</option>
     </select>
     <div class="fila oculto" id="manual">
       <div><label for="nQR">QR por cuadro</label>
-        <select id="nQR"><option>1</option><option>2</option><option>4</option></select></div>
+        <select id="nQR"><option>1</option><option>2</option><option>4</option><option>6</option></select></div>
       <div><label for="tamBloque">Datos por QR</label>
         <select id="tamBloque"><option value="400">400 B</option><option value="600">600 B</option><option value="1000">1000 B</option><option value="1400">1400 B</option></select></div>
       <div><label for="fps">Cuadros por segundo</label>
@@ -114,16 +158,24 @@ details summary { cursor:pointer; color:var(--ac); margin-top:12px; }
 <div id="panelRecibir" class="oculto angosto">
   <section id="cajaCamara">
     <h2>Apunta la cámara a los QR animados</h2>
-    <div class="camara oculto" id="marcoCamara"><video id="video" playsinline muted></video></div>
+    <div class="camara oculto" id="marcoCamara"><video id="video" playsinline muted></video><canvas id="capa"></canvas></div>
+    <p class="nota oculto" id="infoCam"></p>
     <div class="barra"><div id="progreso"></div></div>
     <div class="cifras oculto" id="cifras">
       <div><b id="cPct">0 %</b><span>avance</span></div>
       <div><b id="cVel">–</b><span>velocidad</span></div>
       <div><b id="cEta">–</b><span>falta</span></div>
     </div>
-    <p class="estado" id="estadoRecibir">Toca “Activar cámara” y apunta a los QR de la otra pantalla. Acércate hasta que llenen la imagen.</p>
+    <p class="estado" id="estadoRecibir">Toca “Activar cámara” y apunta a los QR de la otra pantalla. Cada QR que lea se marca en verde; si el emisor usa Máxima, pon el celular horizontal.</p>
+    <details id="ajustesCam" class="oculto"><summary>Ajustes de cámara</summary>
+      <div id="filaZoom" class="oculto"><label for="zoom">Zoom <b id="valZoom"></b></label><input type="range" id="zoom"></div>
+      <div id="filaExpo" class="oculto"><label for="expo">Brillo de la cámara <b id="valExpo"></b></label><input type="range" id="expo"></div>
+    </details>
     <button id="btnCamara">Activar cámara</button>
-    <button class="sec oculto" id="btnCambiarCam">Cambiar cámara</button>
+    <div class="fila oculto" id="botonesCam">
+      <button class="sec oculto" id="btnCambiarCam">Cambiar cámara</button>
+      <button class="sec" id="btnDetenerCam">Detener</button>
+    </div>
   </section>
 
   <section id="resultado" class="oculto listo">
@@ -148,8 +200,11 @@ var ZXingWASM=(function(e){Object.defineProperty(e,Symbol.toStringTag,{value:`Mo
 const $ = id => document.getElementById(id);
 const legible = n => n < 1024 ? n + " B" : n < 1048576 ? (n / 1024).toFixed(1) + " KB" : (n / 1048576).toFixed(2) + " MB";
 const tiempo = s => !isFinite(s) ? "–" : s < 60 ? Math.ceil(s) + " s" : Math.floor(s / 60) + " min " + String(Math.round(s % 60)).padStart(2, "0") + " s";
+const num = n => n.toLocaleString("es-CO");
 const SOBRECOSTO = 1.1;  // el decodificador necesita ~10 % más cuadros que bloques
 const HILOS = Math.max(2, Math.min(4, (navigator.hardwareConcurrency || 4) - 1));
+const guardarPref = (k, v) => { try { localStorage.setItem("qrOffline." + k, v); } catch {} };
+const leerPref = k => { try { return localStorage.getItem("qrOffline." + k); } catch { return null; } };
 
 // ---------- trabajadores (hilos) hechos desde el mismo archivo
 const LIBS = $("libs").textContent;
@@ -173,9 +228,13 @@ self.onmessage = e => {
   }
   postMessage({ id: m.id, qrs }, mover);
 };`;
-const CODIGO_LECTOR = `
+const CODIGO_POSICION = `
+function posicion(q) {
+  return q ? [q.topLeft.x, q.topLeft.y, q.topRight.x, q.topRight.y, q.bottomRight.x, q.bottomRight.y, q.bottomLeft.x, q.bottomLeft.y] : null;
+}`;
+const CODIGO_LECTOR = CODIGO_POSICION + `
 // tryHarder/tryDownscale apagados: 3 veces más rápido y suficiente para QR que llenan la imagen
-const OPC = { formats: ["QRCode"], tryHarder: false, tryDownscale: false, tryInvert: false, tryRotate: false, tryDenoise: false };
+const OPC = { formats: ["QRCode"], tryHarder: false, tryDownscale: false, tryInvert: false, tryRotate: false, tryDenoise: false, maxNumberOfSymbols: 8 };
 let oc = null, octx = null;
 self.onmessage = async e => {
   const m = e.data;
@@ -185,7 +244,7 @@ self.onmessage = async e => {
     catch (err) { postMessage({ tipo: "fallo", msg: String(err) }); }
     return;
   }
-  let textos = [], img = null;
+  let res = [], img = null;
   try {
     if (m.bmp) {
       const w = m.bmp.width, h = m.bmp.height;
@@ -193,12 +252,14 @@ self.onmessage = async e => {
       octx.drawImage(m.bmp, 0, 0);
       img = octx.getImageData(0, 0, w, h);
     } else img = new ImageData(new Uint8ClampedArray(m.buf), m.w, m.h);
-    textos = (await ZXingWASM.readBarcodes(img, { ...OPC, maxNumberOfSymbols: 6 })).filter(r => r.isValid).map(r => r.text);
+    res = (await ZXingWASM.readBarcodes(img, OPC)).filter(r => r.isValid).map(r => ({ t: r.text, p: posicion(r.position) }));
   } catch {}
   if (m.bmp) m.bmp.close();
   img = null;
-  postMessage({ tipo: "resultado", textos });
+  postMessage({ tipo: "resultado", res, esc: m.esc });
 };`;
+// la misma función, para leer en la página cuando no hay hilos
+const posicion = new Function(CODIGO_POSICION + "; return posicion;")();
 
 let wasmBytes = null;
 function wasm() {
@@ -227,7 +288,15 @@ async function mantenerEncendida(si) {
 }
 
 // ================= ENVIAR =================
-const MODOS = { segura: [1, 600, 10], rapida: [2, 1000, 15], turbo: [4, 1000, 20] };
+let fuente = "archivo";
+document.querySelectorAll("[data-fuente]").forEach(b => b.onclick = () => {
+  fuente = b.dataset.fuente;
+  document.querySelectorAll("[data-fuente]").forEach(x => x.setAttribute("aria-selected", x === b));
+  for (const f of ["archivo", "texto", "carpeta"]) $("fuente-" + f).classList.toggle("oculto", f !== fuente);
+  $("estadoEnviar").textContent = "";
+});
+
+const MODOS = { segura: [1, 600, 10], rapida: [2, 1000, 15], turbo: [4, 1000, 20], maxima: [6, 1000, 25] };
 function ajustes() {
   const m = $("modo").value;
   if (m === "manual") return [+$("nQR").value, +$("tamBloque").value, +$("fps").value];
@@ -236,29 +305,33 @@ function ajustes() {
 function notaModo() {
   $("manual").classList.toggle("oculto", $("modo").value !== "manual");
   const [n, tam, fps] = ajustes();
-  $("notaModo").textContent = `Hasta ~${legible(Math.round(n * tam * fps / SOBRECOSTO))}/s si la cámara lee todo. Si el receptor no avanza, baja el modo.`;
+  $("notaModo").textContent = `Hasta ~${legible(Math.round(n * tam * fps / SOBRECOSTO))}/s si la cámara lee todo.` +
+    (n >= 4 ? " Se abre en pantalla completa (Esc para salir)." : "") + (n >= 6 ? " Pon el celular horizontal." : "") +
+    " Si el receptor no avanza, baja el modo.";
 }
-$("modo").onchange = notaModo; ["nQR", "tamBloque", "fps"].forEach(id => $(id).onchange = notaModo);
+$("modo").onchange = () => { guardarPref("modo", $("modo").value); notaModo(); };
+["nQR", "tamBloque", "fps"].forEach(id => $(id).onchange = notaModo);
 $("manual").querySelectorAll("select").forEach(s => s.selectedIndex = Math.min(s.options.length - 1, 2));
+{ const m = leerPref("modo"); if (m && (MODOS[m] || m === "manual")) $("modo").value = m; }
 notaModo();
 
 const lienzo = $("lienzo"), ctx = lienzo.getContext("2d");
-const tx = { activo: false, pausado: false, cola: [], pedidos: 0, sigSeq: 0, gens: [], local: null, mostrados: 0, t0: 0, ultimo: 0 };
+const tx = { activo: false, pausado: false, cola: [], pedidos: 0, sigSeq: 0, gens: [], local: null, mostrados: 0, t0: 0, siguiente: 0 };
 const mini = document.createElement("canvas"), mctx = mini.getContext("2d");
 
 function geometria(nQR, n) {
   const caja = $("lienzoCaja");
   const W = caja.clientWidth - (document.fullscreenElement ? 0 : 16);
   const H = (document.fullscreenElement ? innerHeight : Math.max(320, innerHeight * 0.75)) - (document.fullscreenElement ? 0 : 16);
-  // 4 QR siempre en cuadrícula 2×2: cabe igual con el celular vertical u horizontal
-  const opciones = nQR === 1 ? [[1, 1]] : nQR === 2 ? [[2, 1], [1, 2]] : [[2, 2]];
+  // 4 QR siempre en 2×2 (sirve con el celular vertical u horizontal); 6 QR en 3×2 para el celular horizontal
+  const opciones = nQR === 1 ? [[1, 1]] : nQR === 2 ? [[2, 1], [1, 2]] : nQR <= 4 ? [[2, 2]] : [[3, 2], [2, 3]];
   const gap = 4, margen = 3, dpr = devicePixelRatio || 1;
   let mejor = null;
   for (const [cols, filas] of opciones) {
     const tw = cols * n + (cols - 1) * gap + 2 * margen, th = filas * n + (filas - 1) * gap + 2 * margen;
-    // tamaño de módulo en píxeles de pantalla; si es grande se redondea para que quede nítido
+    // píxeles de pantalla por módulo; solo se redondea cuando es grande, para no achicar el QR
     let px = Math.min(W / tw, H / th) * dpr;
-    if (px >= 4) px = Math.floor(px);
+    if (px >= 8) px = Math.floor(px);
     if (!mejor || px > mejor.px) mejor = { cols, filas, tw, th, px, gap, margen, dpr };
   }
   mejor.px = Math.max(1, mejor.px);
@@ -278,7 +351,7 @@ function pintar(qrs) {
     for (let i = 0; i < q.mod.length; i++) px32[i] = q.mod[i] ? 0xFF000000 : 0xFFFFFFFF;
     mctx.putImageData(img, 0, 0);
     const c = k % g.cols, f = Math.floor(k / g.cols);
-    ctx.drawImage(mini, (g.margen + c * (n + g.gap)) * g.px, (g.margen + f * (n + g.gap)) * g.px, n * g.px, n * g.px);
+    ctx.drawImage(mini, Math.round((g.margen + c * (n + g.gap)) * g.px), Math.round((g.margen + f * (n + g.gap)) * g.px), Math.round(n * g.px), Math.round(n * g.px));
   });
 }
 
@@ -302,10 +375,13 @@ function pedirCuadros() {
 
 function tick(t) {
   if (!tx.activo) return;
-  if (!tx.pausado && t - tx.ultimo >= 1000 / tx.fps - 4) {
+  if (!tx.pausado && t >= tx.siguiente - 2) {
     const cuadro = tx.cola.shift();
     if (cuadro) {
-      pintar(cuadro); tx.ultimo = t; tx.mostrados++;
+      pintar(cuadro); tx.mostrados++;
+      // ritmo promedio exacto aunque no divida la frecuencia del monitor (p. ej. 25 cuadros/s en 60 Hz)
+      const periodo = 1000 / tx.fps;
+      tx.siguiente = Math.max(tx.siguiente + periodo, t + periodo / 2);
       if (tx.mostrados % 10 === 0) {
         const real = tx.mostrados / ((performance.now() - tx.t0) / 1000);
         $("infoEnviar").textContent = `${tx.base} · ${real.toFixed(0)} cuadros/s`;
@@ -316,13 +392,27 @@ function tick(t) {
   requestAnimationFrame(tick);
 }
 
+async function contenidoAEnviar() {
+  if (fuente === "archivo") {
+    const f = $("archivo").files[0];
+    if (!f) throw new Error("Elige un archivo.");
+    return { nombre: f.name, bytes: new Uint8Array(await f.arrayBuffer()) };
+  }
+  if (fuente === "texto") {
+    const texto = $("texto").value;
+    if (!texto) throw new Error("Pega un texto o código.");
+    return { nombre: $("nombreTexto").value.trim() || "texto.txt", bytes: new TextEncoder().encode(texto) };
+  }
+  if (!IA.archivos.length) throw new Error("Elige una carpeta.");
+  if (!IA.archivos.some(a => a.incluir)) throw new Error("No hay archivos marcados en la carpeta.");
+  return { nombre: nombreContexto(), bytes: new TextEncoder().encode(construirMD()) };
+}
+
 async function empezar() {
   const est = $("estadoEnviar");
   let nombre, bytes;
-  const texto = $("texto").value, f = $("archivo").files[0];
-  if (f) { nombre = f.name; bytes = new Uint8Array(await f.arrayBuffer()); }
-  else if (texto) { nombre = $("nombreTexto").value.trim() || "texto.txt"; bytes = new TextEncoder().encode(texto); }
-  else { est.textContent = "Elige un archivo o pega un texto."; return; }
+  try { ({ nombre, bytes } = await contenidoAEnviar()); }
+  catch (e) { est.textContent = e.message; return; }
 
   est.textContent = "Preparando…";
   const [nQR, tam, fps] = ajustes();
@@ -332,7 +422,7 @@ async function empezar() {
   Object.assign(tx, { activo: true, pausado: false, cola: [], pedidos: 0, sigSeq: 0, mostrados: 0, nQR, tam, fps, gens: [] });
   tx.local = new QRT.Codificador(paquete, tam, sesion);
   const K = tx.local.K;
-  // en archivos de un solo bloque no hace falta más de un QR por cuadro
+  // en archivos de uno o dos bloques no hace falta más de un QR por cuadro
   if (K <= 2) tx.nQR = 1;
   for (let i = 0; i < Math.min(HILOS, 3); i++) {
     const w = crearTrabajador(CODIGO_GENERADOR);
@@ -344,15 +434,18 @@ async function empezar() {
     tx.gens.push(g);
   }
   est.textContent = "";
+  document.body.classList.add("transmitiendo");
   $("configEnviar").classList.add("oculto");
   $("transmision").classList.remove("oculto");
+  // con 4 o más QR la pantalla completa es casi obligatoria; se sale con Esc
+  if (tx.nQR >= 4 && document.documentElement.requestFullscreen) $("lienzoCaja").requestFullscreen().catch(() => {});
   const estimado = K <= 1 ? 1 : (K * SOBRECOSTO) / (tx.nQR * fps);
   const comp = paquete.length < bytes.length ? ` (comprimido a ${legible(paquete.length)})` : "";
-  tx.base = `${nombre} · ${legible(bytes.length)}${comp} · ~${tiempo(estimado)} si la cámara lee todo`;
+  tx.base = `${nombre} · ${legible(bytes.length)}${comp} · ~${tiempo(estimado)} si la cámara lee todo` + (tx.nQR >= 6 ? " · celular horizontal" : "");
   $("infoEnviar").textContent = tx.base;
   $("btnPausa").textContent = "Pausar";
   mantenerEncendida(true);
-  tx.t0 = performance.now(); tx.ultimo = 0;
+  tx.t0 = performance.now(); tx.siguiente = 0;
   pedirCuadros();
   requestAnimationFrame(tick);
 }
@@ -361,6 +454,7 @@ function detenerTransmision() {
   tx.activo = false;
   tx.gens.forEach(g => g.w.terminate()); tx.gens = []; tx.cola = []; tx.pedidos = 0;
   if (document.fullscreenElement) document.exitFullscreen().catch(() => {});
+  document.body.classList.remove("transmitiendo");
   $("transmision").classList.add("oculto");
   $("configEnviar").classList.remove("oculto");
   mantenerEncendida(false);
@@ -369,16 +463,259 @@ function detenerTransmision() {
 $("btnEmpezar").onclick = () => empezar().catch(e => { $("estadoEnviar").textContent = "No se pudo preparar: " + e.message; });
 $("btnDetener").onclick = detenerTransmision;
 $("btnPausa").onclick = () => { tx.pausado = !tx.pausado; $("btnPausa").textContent = tx.pausado ? "Seguir" : "Pausar"; };
-$("archivo").onchange = () => { if ($("archivo").files[0]) $("texto").value = ""; };
 if (!document.documentElement.requestFullscreen) $("btnCompleta").classList.add("oculto");
 $("btnCompleta").onclick = () => $("lienzoCaja").requestFullscreen().catch(() => {});
 
+// ================= PREPARAR CARPETA PARA IA =================
+const IA = { raiz: "", archivos: [], dirsOmitidos: new Map() };
+const LIMITE_SUAVE = 200 * 1024;      // más grande: se lista sin marcar
+const LIMITE_DURO = 5 * 1024 * 1024;  // más grande: no se lee (mejor enviarlo con «Archivo»)
+const MAX_FILAS = 1500;
+const DIRS_IGNORADOS = new Set(("node_modules .git .svn .hg __pycache__ .venv venv .tox .nox .mypy_cache .pytest_cache .ruff_cache " +
+  ".ipynb_checkpoints .idea .vscode .vs bin obj dist build out target .next .nuxt .angular .svelte-kit .expo coverage .nyc_output " +
+  ".gradle .terraform bower_components vendor .parcel-cache .turbo .cache site-packages").split(" "));
+const DOCS = new Set("pdf doc docx xls xlsx xlsm ppt pptx odt ods odp rtf".split(" "));
+const BINARIOS = new Set(("png jpg jpeg gif bmp ico webp tif tiff psd ai heic zip rar 7z gz tgz bz2 xz tar jar war ear apk aab exe dll so " +
+  "dylib lib a o class pyc pyo pyd whl egg msi iso img dmg db sqlite sqlite3 mdb accdb mp3 mp4 wav avi mov mkv flac ogg webm m4a " +
+  "woff woff2 ttf otf eot pkl pickle npy npz h5 hdf5 onnx pt pth ckpt safetensors parquet avro orc pdb snk").split(" "));
+const GENERADO = /(\.min\.(js|css)|\.map|(^|\/)(package-lock\.json|yarn\.lock|pnpm-lock\.yaml|poetry\.lock|Pipfile\.lock|composer\.lock|Cargo\.lock|Gemfile\.lock|go\.sum))$/i;
+const SECRETO_NOMBRE = /((^|\/)\.env(\.[^/]*)?|\.(pem|key|p12|pfx|jks|keystore|kdbx|ppk|asc|gpg)|(^|\/)(id_rsa|id_dsa|id_ecdsa|id_ed25519)|(^|\/)(credentials|secrets?)(\.[^/]*)?)$/i;
+const PLANTILLA = /\.(example|sample|template|dist)$/i;
+const CONFIG = /(\.(env|ini|cfg|conf|config|properties|ya?ml|toml|json|xml|plist|tfvars|sh|bash|zsh|bat|cmd)|(^|\/)\.env(\.[^/]*)?)$/i;
+const LENGUAJES = { py: "python", js: "javascript", mjs: "javascript", cjs: "javascript", jsx: "jsx", ts: "typescript", tsx: "tsx",
+  java: "java", kt: "kotlin", cs: "csharp", vb: "vbnet", go: "go", rs: "rust", rb: "ruby", php: "php", c: "c", h: "c", cpp: "cpp",
+  hpp: "cpp", cc: "cpp", swift: "swift", scala: "scala", sql: "sql", sh: "bash", bash: "bash", zsh: "bash", ps1: "powershell",
+  psm1: "powershell", bat: "bat", cmd: "bat", html: "html", htm: "html", css: "css", scss: "scss", less: "less", json: "json",
+  yml: "yaml", yaml: "yaml", toml: "toml", ini: "ini", cfg: "ini", conf: "ini", xml: "xml", csproj: "xml", config: "xml",
+  md: "markdown", r: "r", lua: "lua", pl: "perl", dart: "dart", vue: "vue", svelte: "svelte", tf: "hcl", gradle: "groovy",
+  groovy: "groovy", properties: "properties", csv: "csv", txt: "text", log: "text" };
+
+function lenguaje(ruta) {
+  const n = ruta.split("/").pop().toLowerCase();
+  if (n === "dockerfile") return "dockerfile";
+  if (n === "makefile") return "makefile";
+  if (n.startsWith(".env")) return "bash";
+  return LENGUAJES[n.includes(".") ? n.split(".").pop() : ""] || "";
+}
+
+function esBinario(buf) {
+  const b = new Uint8Array(buf, 0, Math.min(buf.byteLength, 8000));
+  if ((b[0] === 0xFF && b[1] === 0xFE) || (b[0] === 0xFE && b[1] === 0xFF)) return false;  // UTF-16
+  return b.includes(0);
+}
+
+function decodificar(buf) {
+  const b = new Uint8Array(buf);
+  if (b[0] === 0xFF && b[1] === 0xFE) return new TextDecoder("utf-16le").decode(b.subarray(2));
+  if (b[0] === 0xFE && b[1] === 0xFF) return new TextDecoder("utf-16be").decode(b.subarray(2));
+  try { return new TextDecoder("utf-8", { fatal: true }).decode(b); }
+  catch { return new TextDecoder("windows-1252").decode(b); }  // archivos viejos de Windows (ANSI)
+}
+
+// Reemplaza contraseñas, llaves y tokens por «OCULTO». Es una heurística: conviene revisar el resultado.
+const MARCA = "«OCULTO»";
+const CLAVE = "(?:password|passwd|pwd|contrase(?:ñ|n)a|clave|secret(?:[_-]?key)?|token|api[_-]?key|apikey|" +
+  "access[_-]?key(?:[_-]?id)?|private[_-]?key|client[_-]?secret|connection[_-]?string|conn[_-]?str)";
+const RE_CONFIG = new RegExp("((?:^|[\\s{,\"'])[\\w.-]*?" + CLAVE + "[\"']?[ \\t]*[:=][ \\t]*)" +
+  "(?:\"([^\"\\n]{3,})\"|'([^'\\n]{3,})'|([^\\s\"',;#{}]{3,}))", "gim");
+const RE_CODIGO = new RegExp("(\\b[\\w.]*?" + CLAVE + "[\"']?[ \\t]*(?:===?|!==?|=>|:=|[:=])[ \\t]*)" +
+  "(?:\"([^\"\\n]{3,})\"|'([^'\\n]{3,})'|`([^`\\n]{3,})`)", "gi");
+const RE_XML_ETIQUETA = new RegExp("(<[\\w:.-]*?" + CLAVE + ">)([^<]{3,})(</)", "gi");
+const RE_XML_ATRIB = new RegExp("(key\\s*=\\s*[\"'][\\w:.-]*?" + CLAVE + "[\"']\\s+value\\s*=\\s*[\"'])([^\"']{3,})", "gi");
+function ocultarSecretos(texto, ruta) {
+  let n = 0;
+  const r = (re, fn) => { texto = texto.replace(re, (...m) => { const out = fn(...m); if (out !== m[0]) n++; return out; }); };
+  r(/-----BEGIN ([A-Z0-9 ]*)PRIVATE KEY-----[\s\S]*?-----END \1PRIVATE KEY-----/g, () => "«LLAVE PRIVADA OCULTA»");
+  r(/\b(?:AKIA|ASIA)[0-9A-Z]{16}\b/g, () => MARCA);                       // AWS
+  r(/\bgh[pousr]_[A-Za-z0-9]{30,}\b/g, () => MARCA);                       // GitHub
+  r(/\bgithub_pat_[A-Za-z0-9_]{40,}\b/g, () => MARCA);
+  r(/\bxox[abprs]-[A-Za-z0-9-]{10,}\b/g, () => MARCA);                     // Slack
+  r(/\bAIza[0-9A-Za-z_-]{35}\b/g, () => MARCA);                            // Google
+  r(/\bsk-[A-Za-z0-9_-]{20,}\b/g, () => MARCA);                            // OpenAI, Anthropic y similares
+  r(/\beyJ[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}\b/g, () => MARCA);  // JWT
+  r(/\b(Bearer|Basic)\s+[A-Za-z0-9._~+\/=-]{16,}/g, (m, tipo) => tipo + " " + MARCA);
+  r(/\b([a-z][a-z0-9+.-]*:\/\/[^\s:@\/"'<>]+:)([^\s@\/"'<>]+)@/gi, (m, a) => a + MARCA + "@");  // usuario:clave@servidor
+  r(/([;"'`][ \t]*(?:password|pwd)[ \t]*=[ \t]*)([^;"'`\s]+)/gi, (m, a, v) => v.includes("«") ? m : a + MARCA);                   // ...;Password=xxx;
+  r(/(\b(?:with\s+(?:encrypted\s+)?password|identified\s+by)\s+)'([^'\n]{3,})'/gi, (m, a) => a + "'" + MARCA + "'");  // SQL
+  r(/(ConvertTo-SecureString\s+(?:-String\s+)?)(["'])([^"'\n]{3,})\2/gi, (m, a, q) => a + q + MARCA + q);       // PowerShell
+  const comillas = (m, pre, dq, sq, bq, nq) => {
+    const v = dq !== undefined ? dq : sq !== undefined ? sq : bq !== undefined ? bq : nq;
+    if (v === undefined || v.includes("«")) return m;  // ya oculto por otra regla
+    return pre + (dq !== undefined ? '"' + MARCA + '"' : sq !== undefined ? "'" + MARCA + "'" : bq !== undefined ? "`" + MARCA + "`" : MARCA);
+  };
+  if (CONFIG.test(ruta)) {
+    r(RE_CONFIG, (m, pre, dq, sq, nq) => comillas(m, pre, dq, sq, undefined, nq));
+    r(RE_XML_ETIQUETA, (m, a, v, c) => a + MARCA + c);
+    r(RE_XML_ATRIB, (m, a) => a + MARCA);
+  } else {
+    // en código solo se tocan textos entre comillas, para no cambiar cosas como input("...")
+    r(RE_CODIGO, (m, pre, dq, sq, bq) => comillas(m, pre, dq, sq, bq));
+  }
+  return { texto, n };
+}
+
+async function analizar(f, ruta) {
+  const a = { ruta, tam: f.size, incluir: false, motivo: "", texto: null, oculto: null, nOcultos: 0, lang: lenguaje(ruta) };
+  const nombre = ruta.split("/").pop();
+  const ext = nombre.includes(".") ? nombre.split(".").pop().toLowerCase() : "";
+  if (DOCS.has(ext)) { a.motivo = "PDF/Office: envíalo aparte o copia su texto"; return a; }
+  if (BINARIOS.has(ext)) { a.motivo = "binario"; return a; }
+  if (f.size > LIMITE_DURO) { a.motivo = "muy grande: envíalo con «Archivo»"; return a; }
+  const buf = await f.arrayBuffer();
+  if (esBinario(buf)) { a.motivo = "binario"; return a; }
+  a.texto = decodificar(buf).replace(/\r\n?/g, "\n");
+  const o = ocultarSecretos(a.texto, ruta);
+  a.oculto = o.texto; a.nOcultos = o.n;
+  if (SECRETO_NOMBRE.test(ruta) && !PLANTILLA.test(ruta)) a.motivo = "posible secreto";
+  else if (GENERADO.test(ruta)) a.motivo = "generado";
+  else if (f.size > LIMITE_SUAVE) a.motivo = "grande";
+  else if (!a.texto.trim()) a.motivo = "vacío";
+  a.incluir = !a.motivo;
+  return a;
+}
+
+async function prepararCarpeta(lista) {
+  const todos = [...lista];
+  if (!todos.length) return;
+  const est = $("estadoIA");
+  $("resumenIA").classList.add("oculto");
+  est.textContent = `Revisando ${num(todos.length)} archivos…`;
+  const rutas = todos.map(f => (f.webkitRelativePath || f.name).replace(/\\/g, "/"));
+  IA.raiz = rutas[0].includes("/") ? rutas[0].split("/")[0] : "carpeta";
+  // carpetas con pyvenv.cfg son entornos virtuales de Python, aunque no se llamen venv
+  const venvs = rutas.filter(r => /(^|\/)pyvenv\.cfg$/.test(r)).map(r => r.slice(0, r.lastIndexOf("/") + 1));
+  IA.archivos = []; IA.dirsOmitidos = new Map();
+  const sinRaiz = r => r.includes("/") ? r.slice(r.indexOf("/") + 1) : r;
+  for (let i = 0; i < todos.length; i++) {
+    const completa = rutas[i], partes = completa.split("/");
+    let omitida = null;
+    for (let k = 1; k < partes.length - 1; k++) if (DIRS_IGNORADOS.has(partes[k].toLowerCase())) { omitida = partes.slice(0, k + 1).join("/"); break; }
+    if (!omitida) { const v = venvs.find(v => v && completa.startsWith(v)); if (v) omitida = v.slice(0, -1); }
+    if (omitida) { const d = sinRaiz(omitida) || omitida; IA.dirsOmitidos.set(d, (IA.dirsOmitidos.get(d) || 0) + 1); continue; }
+    IA.archivos.push(await analizar(todos[i], sinRaiz(completa)));
+    if (i % 40 === 39) { est.textContent = `Revisando… ${num(i + 1)} de ${num(todos.length)}`; await new Promise(r => setTimeout(r)); }
+  }
+  IA.archivos.sort((x, y) => x.ruta.localeCompare(y.ruta));
+  est.textContent = "";
+  pintarLista();
+  resumirIA();
+  $("resumenIA").classList.remove("oculto");
+}
+
+function pintarLista() {
+  const cont = $("listaIA"), frag = document.createDocumentFragment();
+  cont.textContent = "";
+  IA.archivos.slice(0, MAX_FILAS).forEach((a, i) => {
+    const l = document.createElement("label");
+    const c = document.createElement("input");
+    c.type = "checkbox"; c.checked = a.incluir; c.disabled = a.texto === null; c.dataset.i = i;
+    const r = document.createElement("span"); r.className = "ruta"; r.textContent = a.ruta;
+    const m = document.createElement("span"); m.className = "meta";
+    m.textContent = legible(a.tam) + (a.motivo ? " · " + a.motivo : "") + (a.nOcultos ? ` · ${a.nOcultos} oculto${a.nOcultos > 1 ? "s" : ""}` : "");
+    l.append(c, r, m); frag.append(l);
+  });
+  if (IA.archivos.length > MAX_FILAS) {
+    const p = document.createElement("p"); p.className = "nota";
+    p.textContent = `… y ${num(IA.archivos.length - MAX_FILAS)} más, que se usan según las reglas automáticas.`;
+    frag.append(p);
+  }
+  cont.append(frag);
+}
+
+function resumirIA() {
+  const ocultar = $("ocultarSecretos").checked;
+  const inc = IA.archivos.filter(a => a.incluir);
+  const chars = inc.reduce((s, a) => s + (ocultar ? a.oculto : a.texto).length, 0);
+  $("resumenTxt").textContent = `${num(inc.length)} archivo${inc.length === 1 ? "" : "s"} · ${legible(chars)} · ≈ ${num(Math.round(chars / 4))} tokens`;
+  const sinMarcar = IA.archivos.length - inc.length;
+  const dirs = [...IA.dirsOmitidos.entries()].sort((x, y) => y[1] - x[1]);
+  const partes = [];
+  if (dirs.length) partes.push("Carpetas omitidas: " + dirs.slice(0, 4).map(([d, c]) => `${d} (${num(c)})`).join(", ") + (dirs.length > 4 ? ` y ${dirs.length - 4} más` : "") + ".");
+  if (sinMarcar) partes.push(`${num(sinMarcar)} archivo${sinMarcar === 1 ? "" : "s"} sin marcar (binarios, grandes, generados o posibles secretos); puedes revisarlos en la lista.`);
+  $("omitidosTxt").textContent = partes.join(" ");
+  const con = inc.filter(a => a.nOcultos > 0), total = con.reduce((s, a) => s + a.nOcultos, 0);
+  const st = $("secretosTxt");
+  st.classList.toggle("aviso", !ocultar && total > 0);
+  st.textContent = ocultar
+    ? (total ? `Se ocultarán ${num(total)} contraseña(s) o llave(s) en ${num(con.length)} archivo(s).` : "No encontré contraseñas ni llaves en lo marcado.") +
+      " La detección no es perfecta: revisa el .md antes de enviarlo."
+    : (total ? `Atención: hay ${num(total)} posible(s) contraseña(s) o llave(s) y se enviarán tal cual.` : "");
+  $("sumLista").textContent = `Ver archivos (${num(inc.length)} de ${num(IA.archivos.length)} marcados)`;
+}
+
+function lineasArbol() {
+  const raiz = new Map();
+  const meter = (ruta, hoja) => {
+    const partes = ruta.split("/"); let n = raiz;
+    partes.forEach((p, i) => {
+      if (i === partes.length - 1) { if (!n.has(p)) n.set(p, hoja); return; }
+      let s = n.get(p);
+      if (!(s instanceof Map)) { s = new Map(); n.set(p, s); }
+      n = s;
+    });
+  };
+  for (const a of IA.archivos) meter(a.ruta, { dir: false, marca: a.incluir ? "" : "  (no incluido)" });
+  for (const [d, c] of IA.dirsOmitidos) meter(d, { dir: true, marca: `/  (omitida, ${num(c)} archivos)` });
+  const out = [], MAX = 1500;
+  const esDir = v => v instanceof Map || v.dir;
+  const recorrer = (n, pre) => {
+    const claves = [...n.keys()].sort((x, y) => (esDir(n.get(y)) - esDir(n.get(x))) || x.localeCompare(y));
+    claves.forEach((k, i) => {
+      if (out.length >= MAX) return;
+      const v = n.get(k), ult = i === claves.length - 1;
+      out.push(pre + (ult ? "└── " : "├── ") + k + (v instanceof Map ? "/" : v.marca));
+      if (v instanceof Map) recorrer(v, pre + (ult ? "    " : "│   "));
+    });
+  };
+  recorrer(raiz, "");
+  if (out.length >= MAX) out.push("… (estructura recortada)");
+  return out;
+}
+
+function rachaComillas(t) {
+  let max = 0, act = 0;
+  for (let i = 0; i < t.length; i++) { if (t.charCodeAt(i) === 96) { if (++act > max) max = act; } else act = 0; }
+  return max;
+}
+
+function nombreContexto() { return `contexto-${IA.raiz}.md`; }
+
+function construirMD() {
+  const ocultar = $("ocultarSecretos").checked;
+  const inc = IA.archivos.filter(a => a.incluir);
+  const pedido = $("pedido").value.trim();
+  const nOcultos = ocultar ? inc.reduce((s, a) => s + a.nOcultos, 0) : 0;
+  const fecha = new Date().toLocaleString("es-CO", { dateStyle: "medium", timeStyle: "short" });
+  const L = [`# Contexto del proyecto: ${IA.raiz}`, "",
+    `Generado el ${fecha} con QR Offline. Incluye ${inc.length} de ${IA.archivos.length} archivos.` +
+    (nOcultos ? ` Se reemplazaron ${nOcultos} contraseñas o llaves por «OCULTO».` : ""), ""];
+  if (pedido) L.push("## Lo que necesito", "", pedido, "");
+  L.push("## Estructura", "", "```text", IA.raiz + "/", ...lineasArbol(), "```", "", "## Archivos", "");
+  for (const a of inc) {
+    const t = (ocultar ? a.oculto : a.texto).replace(/\n+$/, "");
+    const cerca = "`".repeat(Math.max(3, rachaComillas(t) + 1));
+    L.push(`### ${a.ruta}`, "", cerca + a.lang, t, cerca, "");
+  }
+  return L.join("\n");
+}
+
+$("carpeta").onchange = () => prepararCarpeta($("carpeta").files).catch(e => { $("estadoIA").textContent = "No se pudo leer la carpeta: " + e.message; });
+$("listaIA").onchange = e => { const i = e.target.dataset && e.target.dataset.i; if (i !== undefined) { IA.archivos[+i].incluir = e.target.checked; resumirIA(); } };
+$("ocultarSecretos").onchange = resumirIA;
+$("btnRevisar").onclick = () => {
+  const u = URL.createObjectURL(new Blob([construirMD()], { type: "text/markdown;charset=utf-8" }));
+  const a = document.createElement("a"); a.href = u; a.download = nombreContexto();
+  document.body.append(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(u), 10000);
+};
+
 // ================= RECIBIR =================
-const rx = { activo: false, flujo: null, lectores: [], local: false, bitmap: true, camaras: [], camIdx: -1, t0: 0, ultimaUI: 0 };
+const rx = { activo: false, flujo: null, lectores: [], local: false, bitmap: true, camaras: [], camIdx: -1, t0: 0, ultimaUI: 0, analizadas: 0, reloj: 0 };
 const dec = new QRT.Decodificador();
 const video = $("video");
 const lector = document.createElement("canvas");
 const lctx = lector.getContext("2d", { willReadFrequently: true });
+const capa = $("capa"), cctx = capa.getContext("2d");
 
 async function prepararLectores() {
   if (rx.lectores.length || rx.local) return;
@@ -393,7 +730,7 @@ async function prepararLectores() {
         const m = e.data;
         if (m.tipo === "listo") { l.ocupado = false; if (!m.offscreen) rx.bitmap = false; rx.lectores.push(l); ok(); }
         else if (m.tipo === "fallo") { w.terminate(); ok(); }
-        else if (m.tipo === "resultado") { l.ocupado = false; procesar(m.textos); }
+        else if (m.tipo === "resultado") { l.ocupado = false; procesar(m.res, m.esc); }
       };
       w.onerror = () => { w.terminate(); ok(); };
     }));
@@ -407,6 +744,64 @@ async function prepararLectores() {
   }
 }
 
+async function abrirFlujo(sel) {
+  // 60 cuadros/s si la cámara los da (el S23 Ultra y muchos celulares recientes sí); zoom: true pide permiso para usar el zoom
+  const v = { ...sel, width: { ideal: 1920 }, height: { ideal: 1080 }, frameRate: { ideal: 60 } };
+  try { return await navigator.mediaDevices.getUserMedia({ video: { ...v, zoom: true }, audio: false }); }
+  catch (e) {
+    if (e.name === "NotAllowedError" || e.name === "SecurityError") throw e;
+    return await navigator.mediaDevices.getUserMedia({ video: v, audio: false });
+  }
+}
+
+function prepararControl(fila, inp, val, nombre, rango, actual, fmt) {
+  if (!rango || !(rango.max > rango.min)) { $(fila).classList.add("oculto"); return false; }
+  const i = $(inp), etiqueta = $(val);
+  i.min = rango.min; i.max = nombre === "zoom" ? Math.min(rango.max, 10) : rango.max; i.step = rango.step || 0.1;
+  i.value = actual !== undefined ? actual : (nombre === "zoom" ? rango.min : 0);
+  etiqueta.textContent = fmt(+i.value);
+  let pendiente = null, aplicando = false;
+  const aplicar = async () => {
+    if (aplicando || pendiente === null || !rx.flujo) return;
+    aplicando = true;
+    const v = pendiente; pendiente = null;
+    try { await rx.flujo.getVideoTracks()[0].applyConstraints({ advanced: [{ [nombre]: v }] }); } catch {}
+    aplicando = false;
+    if (pendiente !== null) aplicar();
+  };
+  i.oninput = () => { etiqueta.textContent = fmt(+i.value); pendiente = +i.value; aplicar(); };
+  $(fila).classList.remove("oculto");
+  return true;
+}
+
+function prepararAjustes(pista) {
+  let cap = {}, conf = {};
+  try { cap = pista.getCapabilities ? pista.getCapabilities() : {}; conf = pista.getSettings ? pista.getSettings() : {}; } catch {}
+  const z = prepararControl("filaZoom", "zoom", "valZoom", "zoom", cap.zoom, conf.zoom, v => v.toFixed(1) + "×");
+  const e = prepararControl("filaExpo", "expo", "valExpo", "exposureCompensation", cap.exposureCompensation, conf.exposureCompensation,
+    v => (v > 0 ? "+" : "") + v.toFixed(1));
+  $("ajustesCam").classList.toggle("oculto", !(z || e));
+}
+
+function infoCamara() {
+  const p = rx.flujo && rx.flujo.getVideoTracks()[0];
+  if (!p) return;
+  let s = {};
+  try { s = p.getSettings(); } catch {}
+  const w = video.videoWidth || s.width, h = video.videoHeight || s.height;
+  const fps = s.frameRate ? ` · ${Math.round(s.frameRate)} fps` : "";
+  const hilos = rx.local ? "1 hilo" : `${rx.lectores.length} hilos`;
+  const nombre = (p.label || "Cámara").slice(0, 40);
+  $("infoCam").textContent = `${nombre} · ${w}×${h}${fps} · ${hilos} · analiza ${rx.analizadas} imágenes/s`;
+  rx.analizadas = 0;
+}
+
+function ajustarMarco() {
+  if (video.videoWidth && video.videoHeight) $("marcoCamara").style.aspectRatio = video.videoWidth + " / " + video.videoHeight;
+}
+video.addEventListener("loadedmetadata", ajustarMarco);
+video.addEventListener("resize", ajustarMarco);
+
 async function activarCamara(deviceId) {
   const est = $("estadoRecibir");
   if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
@@ -416,8 +811,7 @@ async function activarCamara(deviceId) {
   detenerCamara();
   est.textContent = "Abriendo cámara…";
   try {
-    const sel = deviceId ? { deviceId: { exact: deviceId } } : { facingMode: "environment" };
-    rx.flujo = await navigator.mediaDevices.getUserMedia({ video: { ...sel, width: { ideal: 1920 }, height: { ideal: 1080 }, frameRate: { ideal: 30 } }, audio: false });
+    rx.flujo = await abrirFlujo(deviceId ? { deviceId: { exact: deviceId } } : { facingMode: "environment" });
   } catch (e) {
     est.innerHTML = '<span class="error">No se pudo abrir la cámara: ' + (e.name === "NotAllowedError" ? "el permiso fue negado." : e.message) + "</span>";
     return;
@@ -426,8 +820,12 @@ async function activarCamara(deviceId) {
   try { await pista.applyConstraints({ advanced: [{ focusMode: "continuous" }] }); } catch {}
   video.srcObject = rx.flujo;
   await video.play().catch(() => {});
+  document.body.classList.add("recibiendo");
   $("marcoCamara").classList.remove("oculto");
   $("btnCamara").classList.add("oculto");
+  $("botonesCam").classList.remove("oculto");
+  ajustarMarco();
+  prepararAjustes(pista);
   try {
     rx.camaras = (await navigator.mediaDevices.enumerateDevices()).filter(d => d.kind === "videoinput");
     rx.camIdx = rx.camaras.findIndex(c => c.deviceId === pista.getSettings().deviceId);
@@ -436,26 +834,36 @@ async function activarCamara(deviceId) {
   est.textContent = "Preparando lector…";
   await prepararLectores();
   if (!rx.flujo) return;
-  if (dec.sesion === null) est.textContent = `Buscando QR… (cámara ${video.videoWidth}×${video.videoHeight}, ${rx.local ? "1 hilo" : rx.lectores.length + " hilos"})`;
+  if (dec.sesion === null) est.textContent = "Buscando QR… acércate hasta que la cuadrícula llene casi toda la imagen.";
   rx.activo = true;
+  rx.analizadas = 0;
+  $("infoCam").classList.remove("oculto");
+  infoCamara();
+  clearInterval(rx.reloj);
+  rx.reloj = setInterval(infoCamara, 1000);
   mantenerEncendida(true);
   programar();
 }
 
 function detenerCamara() {
   rx.activo = false;
+  clearInterval(rx.reloj);
   if (rx.flujo) rx.flujo.getTracks().forEach(t => t.stop());
   rx.flujo = null;
+  document.body.classList.remove("recibiendo");
   $("marcoCamara").classList.add("oculto");
+  $("infoCam").classList.add("oculto");
+  $("ajustesCam").classList.add("oculto");
   $("btnCamara").classList.remove("oculto");
-  $("btnCambiarCam").classList.add("oculto");
+  $("botonesCam").classList.add("oculto");
+  cctx.clearRect(0, 0, capa.width, capa.height);
   mantenerEncendida(false);
 }
 
 function programar() {
   if (!rx.activo) return;
   if (video.requestVideoFrameCallback) video.requestVideoFrameCallback(capturar);
-  else setTimeout(capturar, 30);
+  else setTimeout(capturar, 16);
 }
 
 let leyendoLocal = false;
@@ -469,7 +877,7 @@ function capturar() {
       // La imagen viaja al hilo sin copiarse en esta página; el hilo la libera al terminar.
       libre.ocupado = true;
       (esc < 1 ? createImageBitmap(video, { resizeWidth: w, resizeHeight: h }) : createImageBitmap(video))
-        .then(bmp => { if (rx.activo) libre.w.postMessage({ bmp }, [bmp]); else { bmp.close(); libre.ocupado = false; } })
+        .then(bmp => { if (rx.activo) libre.w.postMessage({ bmp, esc }, [bmp]); else { bmp.close(); libre.ocupado = false; } })
         .catch(() => { rx.bitmap = false; libre.ocupado = false; });
       programar();
       return;
@@ -479,25 +887,53 @@ function capturar() {
     const img = lctx.getImageData(0, 0, w, h);
     if (libre) {
       libre.ocupado = true;
-      libre.w.postMessage({ buf: img.data.buffer, w, h }, [img.data.buffer]);
+      libre.w.postMessage({ buf: img.data.buffer, w, h, esc }, [img.data.buffer]);
     } else {
       leyendoLocal = true;
-      ZXingWASM.readBarcodes(img, { formats: ["QRCode"], tryHarder: false, tryDownscale: false, tryInvert: false, tryRotate: false, tryDenoise: false, maxNumberOfSymbols: 6 })
-        .then(r => procesar(r.filter(x => x.isValid).map(x => x.text))).catch(() => {}).finally(() => { leyendoLocal = false; });
+      ZXingWASM.readBarcodes(img, { formats: ["QRCode"], tryHarder: false, tryDownscale: false, tryInvert: false, tryRotate: false, tryDenoise: false, maxNumberOfSymbols: 8 })
+        .then(r => procesar(r.filter(x => x.isValid).map(x => ({ t: x.text, p: posicion(x.position) })), esc))
+        .catch(() => {}).finally(() => { leyendoLocal = false; });
     }
   }
   programar();
 }
 
-function procesar(textos) {
+let temporizadorCapa = 0;
+function dibujarCapa(polis, esc) {
+  const r = capa.getBoundingClientRect(), dpr = devicePixelRatio || 1;
+  const W = Math.round(r.width * dpr), H = Math.round(r.height * dpr);
+  if (!W || !H || !video.videoWidth) return;
+  if (capa.width !== W || capa.height !== H) { capa.width = W; capa.height = H; }
+  cctx.clearRect(0, 0, W, H);
+  const vw = video.videoWidth, vh = video.videoHeight, s = Math.min(W / vw, H / vh);
+  const ox = (W - vw * s) / 2, oy = (H - vh * s) / 2;
+  cctx.lineWidth = 3 * dpr; cctx.lineJoin = "round";
+  cctx.strokeStyle = "#22c55e"; cctx.fillStyle = "rgba(34,197,94,.22)";
+  for (const p of polis) {
+    cctx.beginPath();
+    for (let i = 0; i < 8; i += 2) {
+      const x = ox + p[i] / esc * s, y = oy + p[i + 1] / esc * s;
+      if (i) cctx.lineTo(x, y); else cctx.moveTo(x, y);
+    }
+    cctx.closePath(); cctx.fill(); cctx.stroke();
+  }
+  clearTimeout(temporizadorCapa);
+  temporizadorCapa = setTimeout(() => cctx.clearRect(0, 0, capa.width, capa.height), 300);
+}
+
+function procesar(res, esc) {
+  rx.analizadas++;
   if (!rx.activo) return;
-  for (const t of textos) {
+  const polis = [];
+  for (const { t, p } of res) {
     const r = dec.recibir(t);
     if (!r) continue;
+    if (p) polis.push(p);
     if (r.sesionNueva) rx.t0 = performance.now();
     if (dec.errorCrc) { dec.errorCrc = false; $("estadoRecibir").innerHTML = '<span class="error">El archivo llegó dañado; volviendo a empezar…</span>'; continue; }
     if (r.completo) { terminar(); return; }
   }
+  if (polis.length) dibujarCapa(polis, esc || 1);
   const ahora = performance.now();
   if (dec.sesion !== null && ahora - rx.ultimaUI > 200) {
     rx.ultimaUI = ahora;
@@ -530,6 +966,7 @@ async function terminar() {
 }
 
 $("btnCamara").onclick = () => activarCamara();
+$("btnDetenerCam").onclick = detenerCamara;
 $("btnCambiarCam").onclick = () => { if (rx.camaras.length > 1) activarCamara(rx.camaras[(rx.camIdx + 1) % rx.camaras.length].deviceId); };
 $("btnGuardar").onclick = () => $("resEnlace").click();
 $("btnOtro").onclick = () => {
