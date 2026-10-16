@@ -215,14 +215,15 @@ function crearTrabajador(codigo) {
   } catch { return null; }
 }
 const CODIGO_GENERADOR = `
-let cod = null;
+let cod = null, version = 0;
 self.onmessage = e => {
   const m = e.data;
-  if (m.tipo === "iniciar") { cod = new QRT.Codificador(new Uint8Array(m.paquete), m.tam, m.sesion); return; }
+  if (m.tipo === "iniciar") { cod = new QRT.Codificador(new Uint8Array(m.paquete), m.tam, m.sesion); version = 0; return; }
   const qrs = [], mover = [];
   for (const seq of m.seqs) {
-    const q = qrcode(0, "L"); q.addData(cod.cuadro(seq), "Alphanumeric"); q.make();
+    const q = qrcode(version, "L"); q.addData(cod.cuadro(seq), "Alphanumeric"); q.make();
     const n = q.getModuleCount(), mod = new Uint8Array(n * n);
+    if (!version) version = (n - 17) / 4;
     for (let r = 0; r < n; r++) for (let c = 0; c < n; c++) mod[r * n + c] = q.isDark(r, c) ? 1 : 0;
     qrs.push({ n, mod }); mover.push(mod.buffer);
   }
@@ -365,8 +366,9 @@ function pedirCuadros() {
       w.w.postMessage({ seqs });
     } else {
       // sin hilos: generar aquí mismo
-      tx.cola.push(seqs.map(seq => { const q = qrcode(0, "L"); q.addData(tx.local.cuadro(seq), "Alphanumeric"); q.make();
+      tx.cola.push(seqs.map(seq => { const q = qrcode(tx.version || 0, "L"); q.addData(tx.local.cuadro(seq), "Alphanumeric"); q.make();
         const n = q.getModuleCount(), mod = new Uint8Array(n * n);
+        if (!tx.version) tx.version = (n - 17) / 4;
         for (let r = 0; r < n; r++) for (let c = 0; c < n; c++) mod[r * n + c] = q.isDark(r, c) ? 1 : 0;
         return { n, mod }; }));
     }
@@ -419,7 +421,7 @@ async function empezar() {
   const paquete = await QRT.empaquetar(nombre, bytes);
   const sesion = crypto.getRandomValues(new Uint32Array(1))[0];
   detenerTransmision();
-  Object.assign(tx, { activo: true, pausado: false, cola: [], pedidos: 0, sigSeq: 0, mostrados: 0, nQR, tam, fps, gens: [] });
+  Object.assign(tx, { activo: true, pausado: false, cola: [], pedidos: 0, sigSeq: 0, mostrados: 0, nQR, tam, fps, gens: [], version: 0 });
   tx.local = new QRT.Codificador(paquete, tam, sesion);
   const K = tx.local.K;
   // en archivos de uno o dos bloques no hace falta más de un QR por cuadro
