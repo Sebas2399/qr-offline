@@ -1,5 +1,5 @@
 // Guarda la app en el celular para que funcione sin internet después de la primera visita.
-const CACHE = "qr-offline-v1";
+const CACHE = "qr-offline-v2";
 const ARCHIVOS = ["./", "./index.html", "./manifest.webmanifest", "./icono-192.png", "./icono-512.png"];
 self.addEventListener("install", e => { e.waitUntil(caches.open(CACHE).then(c => c.addAll(ARCHIVOS))); self.skipWaiting(); });
 self.addEventListener("activate", e => {
